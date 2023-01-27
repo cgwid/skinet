@@ -1,0 +1,212 @@
+Deploy to Linux using Docker - for use with .Net 5.0
+====================================================
+
+1. Create a new droplet with Digital Ocean using the Docker 19.03.12 on Ubuntu 20.04
+
+IP address: Your IP address
+Password for root user: YourPassword
+
+2. Login to the droplet using either the terminal or Powershell:
+
+ssh root@ipaddress
+
+You will be asked for your password.   Enter this.
+
+3.  Create a new docker-compose file using the following command:
+
+sudo nano docker-compose.yml
+
+4.  Copy and paste in the docker-compose configuration:
+
+services:
+
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=root
+      - HTTP_PASSWORD=secret
+    ports:
+      - 8081:8081
+    depends_on:
+      - redis
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: appuser
+    ports: 
+      - 5432:5432
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    
+volumes:
+  redis-data:
+
+5.  Run the following command to start the docker services
+
+docker-compose up -d
+
+6.  Install and configure apache by running the following commands:
+
+sudo apt update
+sudo apt install apache2
+a2enmod proxy proxy_http proxy_html rewrite
+systemctl restart apache2
+sudo ufw app list
+sudo ufw allow 'Apache Full'
+sudo systemctl status apache2
+
+7.   Optional - allow the ports through the firewall to allow you to manage PostGreSQL and Redis via the ports.
+
+sudo ufw allow 8080/tcp
+sudo ufw allow 8081/tcp
+
+8.  Test you can access the default apache page by browsing to:  http://ipaddress
+
+9.  Create a new directory that will contain our published dotnet app and assign rights to the user:
+
+sudo mkdir /var/skinet
+sudo chown -R $USER:$USER /var/skinet
+
+10.  Create a new config file for the skinet app:
+
+sudo nano /etc/apache2/sites-available/skinet.conf
+
+11.  Paste in the following configuration which will set up a reverse proxy with the Kestrel server:
+
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:5000/
+    ProxyPassReverse / http://127.0.0.1:5000
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+12.  Enable the skinet site by running the following commands:
+
+a2ensite skinet
+ls /etc/apache2/sites-enabled
+a2dissite 000-default
+systemctl reload apache2
+
+13.  Install the deploy reloaded extension.   Create a settings.json file in the .vscode directory and update the IP address and password for your server:
+
+{
+    "deploy.reloaded": {
+        "packages": [
+            {
+                "name": "Version 1.0.0",
+                "description": "Package version 1.0.0",
+
+                "files": [
+                    "publish/**"
+                ]
+            }
+        ],
+
+        "targets": [
+            {
+                "type": "sftp",
+                "name": "Linux",
+                "description": "SFTP folder",
+
+                "host": "ipaddress", "port": 22,
+                "user": "root", "password": "your password",
+
+                "dir": "/var/skinet",
+                "mappings": {
+                    "publish/**": "/"
+                }
+            }
+        ]
+    }
+}
+
+14.  Optional - Change the logging level for the appsettings.json to information for the Microsoft logging level:
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+}
+
+15.  Republish the app with changes by running the following command in VS Code terminal:
+
+dotnet publish -c Release -o publish skinet.sln
+
+16.  Deploy the files by using the command pallette -> deploy reloaded -> deploy package
+
+17.  Add an endpoint to stripe for to point to the IP address of the server and select the 2 events we want to listen to:  payment_intent.succeeded, payment_intent.payment_failed.  Note the web hook secret as we will need this soon.
+
+http://ipaddress/api/payments/webhook
+
+18.  Back on the linux server create a service config for the kestrel server:
+
+sudo nano /etc/systemd/system/skinet-web.service
+
+19.  Update the configuration for your API keys where it says REPLACEME and then paste the config into the nano editor
+
+[Unit]
+Description=Kestrel service running on Ubuntu 20.04
+[Service]
+WorkingDirectory=/var/skinet
+ExecStart=/usr/bin/dotnet /var/skinet/API.dll
+Restart=always
+RestartSec=10
+SyslogIdentifier=skinet
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment='Token__Key=CHANGE ME TO SOMETHING SECURE'
+Environment='Token__Issuer=http://REPLACEME'
+Environment='StripeSettings__PublishibleKey=REPLACEME'
+Environment='StripeSettings__SecretKey=REPLACEME'
+Environment='StripeSettings__WhSecret=REPLACEME'
+Environment='ConnectionStrings__DefaultConnection=Server=localhost;Port=5432;User Id=appuser;Password=secret; Database=skinet'
+Environment='ConnectionStrings__IdentityConnection=Server=localhost;Port=5432;User Id=appuser;Password=secret; Database=identity'
+Environment='ConnectionStrings__Redis=localhost'
+Environment='ApiUrl=http://ipaddress/Content/'
+[Install]
+WantedBy=multi-user.target
+
+20.  Install the .Net runtime using the instructions here:  https://docs.microsoft.com/en-gb/dotnet/core/install/linux-ubuntu#2004-
+
+21.  Restart the journal service by running the following command:
+
+systemctl restart systemd-journald
+
+22.  Start the kestrel service by running the following command:
+
+sudo systemctl start skinet-web.service
+
+23.  Check it is started by running: 
+
+netstat -ntpl
+
+24.  Check the journal by running:
+
+journalctl -u skinet-web.service --since "5 min ago"
+
+25.  Make sure there are no errors and then test you can browse to the published app on http://ipaddress
+
+
+
