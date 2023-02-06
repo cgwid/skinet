@@ -23,6 +23,23 @@ namespace Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder builder){
             base.OnModelCreating(builder);
             builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+
+            // Converting from decimal to double for SQLite DB since it does not support decimal type
+            if(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                foreach (var entityType in builder.Model.GetEntityTypes())
+                {
+                    var properties = entityType.ClrType.GetProperties().Where(p => p.PropertyType == typeof(decimal));
+
+                    foreach (var property in properties)
+                    {
+                        builder.Entity(entityType.Name).Property(property.Name).HasConversion<double>();
+                    }
+                }
+            }
+
+
+
         }
 
 

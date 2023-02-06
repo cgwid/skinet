@@ -19,6 +19,21 @@ namespace Infrastructure.Data
                 query = query.Where(spec.Criteria);
             }
 
+            if (spec.OrderBy != null) 
+            {
+                query = query.OrderBy(spec.OrderBy);
+            }
+
+            if (spec.OrderByDesc != null) 
+            {
+                query = query.OrderByDescending(spec.OrderByDesc);
+            }
+
+            if (spec.isPagingEnabled)
+            {
+                query = query.Skip(spec.Skip).Take(spec.Take);
+            }
+
             // Aggregate method explained: The first parameter "query" is essentially the "seed" when you look
             // at the Microsoft documenation. The 2nd parameter is a function. The parameter "current" within
             // the function is the value of "query". "include" param is the first element in the "Includes" list.
