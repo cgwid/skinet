@@ -7,7 +7,7 @@ import { HomeComponent } from './home/home.component';
 
 
 const routes: Routes = [
-  {path: '', component: HomeComponent},
+  {path: '', component: HomeComponent, data: {breadcrumb: 'Home'}},
   // lazy loading the shop module
   {path: 'shop', loadChildren: () => import('./shop/shop.module').then(m => m.ShopModule)},
   {path: 'test-error', component: TestErrorComponent},
