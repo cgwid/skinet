@@ -12,6 +12,9 @@ namespace API.Helpers
     {
         public MapperProfiles()
         {
+            // This is to map the ProductBrand and Product Type name to the property ProductBrand
+            // and ProductType within the ProducttoReturnDto -- also configures the custom mapping
+            // want for the picture url using the resolver
             CreateMap<Product, ProductToReturnDto>()
                 .ForMember(d => d.ProductBrand, o => o.MapFrom(s => s.ProductBrand.Name))
                 .ForMember(d => d.ProductType, o => o.MapFrom(s => s.ProductType.Name))

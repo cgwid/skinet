@@ -16,6 +16,7 @@ namespace API.Helpers
             _config = config;
         }
 
+        // This is used to get the full path to the picture and not use the relataive url, for AutoMapper
         public string Resolve(Product source, ProductToReturnDto destination, string destMember, ResolutionContext context)
         {
             return _config["ApiUrl"] + source.PictureUrl;
