@@ -7,6 +7,7 @@ using Core.Interfaces;
 using Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 namespace API.Extensions
 {
@@ -15,14 +16,24 @@ namespace API.Extensions
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration config)
         {
             services.AddScoped<IProductRepository, ProductRepository>();
+
+            // Generic Repository for specification pattern
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+            services.AddScoped<IBasketRepository, BasketRepository>();
+
             services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
             services.AddDbContext<StoreContext>(x => 
                 x.UseSqlite(config.GetConnectionString("DefaultConnection")));
 
+            // Setting up Redis
+            services.AddSingleton<IConnectionMultiplexer>(c => {
+                var options = ConfigurationOptions.Parse(config.GetConnectionString("Redis"));
+                return ConnectionMultiplexer.Connect(options);
+            });
 
 
+            // Custom tweaking for error response
             services.Configure<ApiBehaviorOptions>(options => 
             {
                 options.InvalidModelStateResponseFactory = actionContext => 

@@ -18,6 +18,7 @@ namespace API
             var host = CreateHostBuilder(args).Build();
 
             // using statement to create a scope that will dispose when done. 
+            // Applying any pending migrations and seeding database
             using (var scope = host.Services.CreateScope()) 
             {
                 // Get services
@@ -33,6 +34,7 @@ namespace API
                     // Apply any pending migrations for the context to the database and create the database if one does
                     // not exist
                     await context.Database.MigrateAsync();
+                    // Seed database if there is no data
                     await StoreContextSeed.SeedAysnc(context, loggerFactory);
 
                 } catch (Exception ex)
